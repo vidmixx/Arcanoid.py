@@ -1,174 +1,275 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+from tkinter import *
+import time
+import random
+import os
+from tkinter import messagebox
 
-# C extensions
-*.so
+class Ball():
+    def __init__(self, canvas, platform, color):
+        """Инициализация объекта Ball.
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+        Параметры:
+        canvas -- холст, на котором будет рисоваться шарик
+        platform -- платформа, с которой будет отскакивать шарик
+        color -- цвет шарика
+        """
+        self.canvas = canvas  # Сохраняем ссылку на холст
+        self.platform = platform  # Сохраняем ссылку на платформу
+        # Создаем шарик на холсте с заданными координатами и цветом
+        self.oval = canvas.create_oval(200, 200, 215, 215, fill="darkblue")
+        # Возможные значения скорости по оси X
+        self.dir = [-3, -2, -1, 1, 2, 3]
+        self.x = random.choice(self.dir)  # Случайная скорость по оси X
+        self.y = -1  # Начальная скорость по оси Y (шарик будет двигаться вверх)
+        self.touch_bottom = False  # Флаг, указывающий, коснулся ли шарик нижней границы
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+    def touch_platform(self, ball_pos):
+        """Проверка, касается ли шарик платформы.
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+        Параметры:
+        ball_pos -- координаты шарика (x0, y0, x1, y1), где
+                    (x0, y0) - верхний левый угол,
+                    (x1, y1) - нижний правый угол
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+        Возвращает:
+        True, если шарик касается платформы, иначе False.
+        """
+        # Получаем координаты платформы
+        platform_pos = self.canvas.coords(self.platform.rect)
+        # Проверяем, находится ли шарик в пределах платформы
+        if ball_pos[2] >= platform_pos[0] and ball_pos[0] <= platform_pos[2]:
+            if ball_pos[3] >= platform_pos[1] and ball_pos[3] <= platform_pos[3]:
+                return True  # Шарик касается платформы
+        return False  # Шарик не касается платформы
+    def draw(self):
+        self.canvas.move(self.oval, self.x, self.y)
+        pos = self.canvas.coords(self.oval)
 
-# Translations
-*.mo
-*.pot
+        if pos[1] <= 0:
+            self.y = 3
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+        if pos[3] >= 400:
+            self.touch_bottom = True
 
-# Flask stuff:
-instance/
-.webassets-cache
+        if self.touch_platform(pos):
+            self.y = -3
+            self.platform.score += 1
 
-# Scrapy stuff:
-.scrapy
+            if self.platform.score == 5:
+                self.x *= 1.2
 
-# Sphinx documentation
-docs/_build/
+            if self.platform.score == 10:
+                self.x *= 1.2
 
-# PyBuilder
-.pybuilder/
-target/
+        if pos[0] <= 0:
+            self.x = 3
+        if pos[2] >= 500:
+            self.x = -3
 
-# Jupyter Notebook
-.ipynb_checkpoints
 
-# IPython
-profile_default/
-ipython_config.py
+class Platform():
+    def __init__(self, canvas, color):
+        self.canvas = canvas
+        self.rect = canvas.create_rectangle(230, 300, 330, 310, fill=color)
+        self.x = 0
+        self.score = 0
+        self.canvas.bind_all('<KeyPress-Left>', self.left)
+        self.canvas.bind_all('<KeyPress-Right>', self.right)
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+    def left(self, event):
+        self.x = -5
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+    def right(self, event):
+        self.x = 5
 
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
+    def draw(self):
+        self.canvas.move(self.rect, self.x, 0)
+        pos = self.canvas.coords(self.rect)
+        if pos[0] <= 0:
+            self.x = 0
+        if pos[2] >= 500:
+            self.x = 0
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
-.pdm.toml
-.pdm-python
-.pdm-build/
+class GameApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Арканоид")
+        self.master.geometry("500x400")
+        self.master.resizable(False, False)
+        self.results = self.load_results()
+        self.current_page = 0
+        self.results_per_page = 7  # Максимум 7 результатов на странице
+        self.start_window()
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+    def load_results(self):
+        if os.path.exists("results.txt"):
+            with open("results.txt", "r") as file:
+                results = []
+                for line in file.readlines():
+                    try:
+                        results.append(int(line.strip().replace(",", "")))  # Убираем запятые
+                    except ValueError:
+                        print(f"Неверный формат строки: '{line.strip()}', пропускаем.")
+                return results
+        return []
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+    def save_results(self):
+        with open("results.txt", "w") as file:
+            for score in self.results:
+                file.write(f"{score}\n")
 
-# SageMath parsed files
-*.sage.py
+    # Остальные методы остаются без изменений...
+    def start_window(self):
+        self.clear_window()
+        self.start_frame = Frame(self.master)
+        self.start_frame.pack(fill=BOTH, expand=True)
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+        title_label = Label(self.start_frame, text="Добро пожаловать \n"
+                                                   " в Арканоид!", font=("Arial", 24))
+        title_label.pack(pady=20)
 
-# Spyder project settings
-.spyderproject
-.spyproject
+        button_frame = Frame(self.start_frame)
+        button_frame.pack(pady=10)
 
-# Rope project settings
-.ropeproject
+        start_button = Button(button_frame, text="Начать игру", command=self.start_game)
+        start_button.pack(side=TOP, pady=5)
 
-# mkdocs documentation
-/site
+        results_button = Button(button_frame, text="Результаты", command=self.show_results)
+        results_button.pack(side=TOP, pady=5)
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+        about_button = Button(button_frame, text="О программе", command=self.show_about)
+        about_button.pack(side=TOP, pady=5)
 
-# Pyre type checker
-.pyre/
+        # Центрируем button_frame в start_frame
+        button_frame.pack(side=TOP, padx=20, pady=20)
 
-# pytype static type analyzer
-.pytype/
+    def clear_window(self):
+        for widget in self.master.winfo_children():
+            widget.destroy()
 
-# Cython debug symbols
-cython_debug/
+    def start_game(self):
+        self.clear_window()
+        self.canvas = Canvas(self.master, width=500, height=400)
+        self.canvas.pack()
+        self.platform = Platform(self.canvas, 'green')
+        self.ball = Ball(self.canvas, self.platform, 'red')
+        self.game_loop()
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+    def game_loop(self):
+        while True:
+            if not self.ball.touch_bottom:
+                self.ball.draw()
+                self.platform.draw()
+            else:
+                self.results.append(self.platform.score)
+                self.save_results()
+                self.game_over()
+                break
 
-# Ruff stuff:
-.ruff_cache/
+            self.master.update()
+            time.sleep(0.01)
 
-# PyPI configuration file
-.pypirc
+    def game_over(self):
+        self.canvas.destroy()
+        self.show_game_over()
+
+    def show_game_over(self):
+        self.clear_window()
+
+        score_label = Label(self.master, text=f"Вы проиграли! Счет: {self.platform.score}", font=("Arial", 16))
+        score_label.pack(pady=20)
+
+        button_frame = Frame(self.master)
+        button_frame.pack(side=BOTTOM, fill=X)
+
+        restart_button = Button(button_frame, text="Начать заново", command=self.start_game)
+        restart_button.pack(side=LEFT, padx=20, pady=10)
+
+        menu_button = Button(button_frame, text="Меню", command=self.start_window)
+        menu_button.pack(side=LEFT, padx=20, pady=10)
+
+        exit_button = Button(button_frame, text="Выйти из игры", command=self.master.quit)
+        exit_button.pack(side=RIGHT, padx=20, pady=10)
+
+    def show_results(self):
+        self.clear_window()
+
+        results_label = Label(self.master, text="Результаты прошлых игр", font=("Arial", 16))
+        results_label.pack(pady=20)
+
+        results_frame = Frame(self.master)
+        results_frame.pack(pady=10)
+
+        self.display_results(results_frame)
+
+        button_frame = Frame(self.master)
+        button_frame.pack(side=BOTTOM, fill=X)
+
+        reset_button = Button(button_frame, text="Сбросить результаты", command=self.reset_results)
+        reset_button.pack(side=LEFT, padx=20, pady=10)
+
+        back_button = Button(button_frame, text="Назад", command=self.start_window)
+        back_button.pack(side=RIGHT, padx=20, pady=10)
+
+        # Кнопки для навигации по страницам
+        if (self.current_page + 1) * self.results_per_page < len(self.results):
+            next_page_button = Button(button_frame, text="Далее", command=self.next_page)
+            next_page_button.pack(side=RIGHT, padx=20, pady=10)
+
+        if self.current_page > 0:
+            prev_page_button = Button(button_frame, text="Назад", command=self.prev_page)
+            prev_page_button.pack(side=LEFT, padx=20, pady=10)
+
+    def display_results(self, frame):
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        start_index = self.current_page * self.results_per_page
+        end_index = start_index + self.results_per_page
+        page_results = self.results[start_index:end_index]
+
+        for idx, score in enumerate(page_results):
+            score_text = f"Игра {start_index + idx + 1}: {score}"
+            score_label = Label(frame, text=score_text)
+            score_label.pack()  # Используем pack для вертикального размещения
+
+    def next_page(self):
+        if (self.current_page + 1) * self.results_per_page < len(self.results):
+            self.current_page += 1
+            self.show_results()
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.show_results()
+
+    def reset_results(self):
+        self.results.clear()
+        self.save_results()
+        messagebox.showinfo("Сброс результатов", "Результаты успешно сброшены.")
+        self.show_results()
+
+    def show_about(self):
+        """Отображение информации о программе."""
+        about_window = Toplevel(self.master)  # Создание нового окна
+        about_window.title("О программе")  # Заголовок окна
+        about_window.geometry("300x200")  # Размер окна
+        about_window.resizable(False, False)  # Запрет на изменение размера окна
+
+        # Информация о разработчиках и версии
+        about_label = Label(about_window, text="Разработчики:\n\n"
+                                                "Окорокова Виктория\n"
+                                                "Губин Иван\n"
+                                                "Герасимова Мария\n"
+                                                "Самсонов Сергей\n\n", justify=CENTER)
+        about_label.pack(pady=20)  # Размещение метки с информацией
+
+        # Кнопка для закрытия окна "О программе"
+        ok_button = Button(about_window, text="ОК", command=about_window.destroy)  # Закрытие окна
+        ok_button.pack(pady=10)  # Размещение кнопки
+
+if __name__ == "__main__":
+    root = Tk()  # Создание основного окна приложения
+    app = GameApp(root)  # Инициализация приложения
+    root.mainloop()  # Запуск
